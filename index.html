@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Berechnung Übersetzungsverhältnis & Visuelle Banddarstellung</title>
+    
+    <!-- MathJax Bibliothek (Robuster als KaTeX für lokale HTML-Dateien) -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['$$', '$$']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --primary: #009B4C; /* STAG Green */
+            --primary-hover: #007A3B;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --text-muted: #666666;
+            --border: #cccccc;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        header {
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #111;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: var(--primary);
+            margin-bottom: 15px;
+            border-left: 4px solid var(--primary);
+            padding-left: 8px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e9e9e9;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .input-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .input-controls input[type="range"] {
+            flex: 1;
+            accent-color: var(--primary);
+            height: 6px;
+            cursor: pointer;
+        }
+
+        .input-controls input[type="text"],
+        .input-controls input[type="number"] {
+            width: 95px;
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: right;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eeeeee;
+        }
+
+        .result-row:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .result-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #111;
+        }
+
+        .highlight-box {
+            background: #e6f5ed;
+            border: 1px solid var(--primary);
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .highlight-box .result-value {
+            color: var(--primary);
+            font-size: 20px;
+        }
+
+        .unit {
+            font-weight: normal;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: 3px;
+        }
+        
+        .info-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 20px;
+            min-height: 280px;
+        }
+
+        #visualizer {
+            background: #fdfdfd;
+            max-width: 100%;
+        }
+
+        .info-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .info-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .modal-overlay {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0,0,0,0.6); 
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: #111;
+        }
+
+        .formula-block {
+            background: #f9f9f9;
+            padding: 12px;
+            border-left: 3px solid var(--primary);
+            margin-bottom: 12px;
+            border-radius: 0 4px 4px 0;
+            border: 1px solid #eee;
+            border-left-width: 3px;
+        }
+        
+        .formula-block p {
+            margin-top: 5px;
+        }
+
+        .ist-werte-section {
+            margin-top: 35px;
+            border-top: 2px solid var(--primary);
+            padding-top: 20px;
+            background: #f4f7f5;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e1e8e4;
+        }
+        
+        .active-input-box {
+            background: #ffffff;
+            padding: 15px;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,155,76,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Auslegung Getriebeübersetzung & Bandgeschwindigkeit</h1>
+        <button class="info-btn" onclick="openModal()">ℹ️ Formeln anzeigen</button>
+    </header>
+
+    <div class="grid">
+        <!-- Linke Spalte: Eingaben & Grafik -->
+        <div>
+            <div class="section">
+                <h2>1. Vorgaben & Soll-Werte</h2>
+
+                <div class="input-group">
+                    <label for="trommel">Trommeldurchmesser (D)</label>
+                    <div class="input-controls">
+                        <input type="range" id="trommel_slider" min="100" max="1500" step="5" value="575" oninput="updateFromSlider('trommel')">
+                        <input type="number" id="trommel_num" min="100" max="2500" step="1" value="575" oninput="updateFromNum('trommel')">
+                        <span class="unit">mm</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="band">Stärke des Bandes (s)</label>
+                    <div class="input-controls">
+                        <input type="range" id="band_slider" min="0" max="50" step="0.5" value="10" oninput="updateFromSlider('band')">
+                        <input type="text" id="band_num" inputmode="decimal" value="10" oninput="updateFromNum('band')">
+                        <span class="unit">mm</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="n_motor">Motordrehzahl (n₁)</label>
+                    <div class="input-controls">
+                        <input type="range" id="n_motor_slider" min="500" max="3600" step="10" value="1470" oninput="updateFromSlider('n_motor')">
+                        <input type="number" id="n_motor_num" min="100" max="10000" step="10" value="1470" oninput="updateFromNum('n_motor')">
+                        <span class="unit">min⁻¹</span>
+                    </div>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label for="v_soll">Gewünschte Bandgeschwindigkeit (v_soll)</label>
+                    <div class="input-controls">
+                        <input type="range" id="v_soll_slider" min="0.1" max="5.0" step="0.1" value="1.0" oninput="updateFromSlider('v_soll')">
+                        <input type="text" id="v_soll_num" inputmode="decimal" value="1.0" oninput="updateFromNum('v_soll')">
+                        <span class="unit">m/s</span>
+                    </div>
+                    <div class="info-text">Tipp: Sie können sowohl Punkt (.) als auch Komma (,) verwenden.</div>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <h3 style="font-size: 14px; margin-bottom: 10px; align-self: flex-start; color: #444;">Maßstabsgetreue Querschnittansicht</h3>
+                <canvas id="visualizer" width="340" height="240"></canvas>
+            </div>
+        </div>
+
+        <!-- Rechte Spalte: Ergebnisse -->
+        <div>
+            <div class="section" style="min-height: 523px; display: flex; flex-direction: column; justify-content: flex-start;">
+                <h2>2. Berechnungsergebnisse (Soll)</h2>
+                
+                <div class="result-row">
+                    <span class="result-label">Effektiver Außendurchmesser (D_eff):</span>
+                    <span class="result-value" id="res_d_eff">0.595<span class="unit">m</span></span>
+                </div>
+
+                <div class="result-row" style="background: #fdfdfd; padding: 12px 5px; border-radius: 4px;">
+                    <span class="result-label" style="font-weight: 600;">Förderlänge pro Umdrehung (U_eff):</span>
+                    <span class="result-value" id="res_u_eff" style="color: #005A2B;">1.869<span class="unit">m/Umdr.</span></span>
+                </div>
+                
+                <div class="result-row" style="margin-top: 10px;">
+                    <span class="result-label">Erforderliche Übersetzung (i_soll):</span>
+                    <span class="result-value" id="res_i_soll">45.21</span>
+                </div>
+
+                <div class="highlight-box">
+                    <div class="result-row" style="border: none; padding: 0;">
+                        <span class="result-label" style="font-weight: 600; color: #111;">Erforderliche Trommeldrehzahl (n₂_soll):</span>
+                        <span class="result-value" id="res_n2_soll">32.1<span class="unit">min⁻¹</span></span>
+                    </div>
+                </div>
+
+                <!-- Bereich: Abgleich Ist-Werte -->
+                <div class="ist-werte-section">
+                    <h2>3. Abgleich mit Ist-Werten</h2>
+
+                    <div class="input-group active-input-box">
+                        <label for="i_ist" style="color: var(--primary);">Gewählte Übersetzung laut Katalog (i_ist)</label>
+                        <div class="input-controls" style="margin-top: 8px;">
+                            <input type="range" id="i_ist_slider" min="1" max="150" step="0.1" value="25" oninput="updateFromSlider('i_ist')">
+                            <input type="text" id="i_ist_num" inputmode="decimal" value="25.00" oninput="updateFromNum('i_ist')">
+                            <span class="unit">i</span>
+                        </div>
+                    </div>
+
+                    <div class="result-row">
+                        <span class="result-label">Tatsächliche Trommeldrehzahl (n₂_ist):</span>
+                        <span class="result-value" id="res_n2_ist">58.0<span class="unit">min⁻¹</span></span>
+                    </div>
+
+                    <div class="highlight-box" style="background: #ffffff; border-color: #009B4C;">
+                        <div class="result-row" style="border: none; padding: 0;">
+                            <span class="result-label" style="font-weight: 600; color: #111;">Resultierende Bandgeschwindigkeit (v_ist):</span>
+                            <span class="result-value" id="res_v_ist" style="color: #007A3B;">1.81<span class="unit">m/s</span></span>
+                        </div>
+                    </div>
+                    
+                    <div class="result-row" style="margin-top: 10px;">
+                        <span class="result-label">Abweichung zur Soll-Geschwindigkeit:</span>
+                        <span class="result-value" id="res_v_diff">+81.0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal für die Formeln -->
+<div id="infoModal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="close-btn" onclick="closeModal(event)">&times;</span>
+        <h2 style="border: none; padding: 0; margin-bottom: 20px;">Verwendete Formeln</h2>
+        <p style="font-size: 14px; margin-bottom: 15px; color: #444;">Hier finden Sie die ingenieurstechnischen Berechnungsgrundlagen, die im Hintergrund ausgeführt werden:</p>
+        
+        <div class="formula-block">
+            <strong style="font-size: 14px;">1. Effektiver Außendurchmesser (\(D_{\text{eff}}\))</strong>
+            <p style="font-size: 13px; color: var(--text-muted);">Berechnung auf Basis des vollen Außendurchmessers (Materialauflage):</p>
+            $$D_{\text{eff}} = D + 2s$$
+            <p style="font-size: 12px; color: #777;">\(D\) = Trommeldurchmesser [mm], \(s\) = Bandstärke [mm]</p>
+        </div>
+
+        <div class="formula-block">
+            <strong style="font-size: 14px;">2. Effektiver Umfang / Förderlänge (\(U_{\text{eff}}\))</strong>
+            $$U_{\text{eff}} = \pi \cdot D_{\text{eff}}$$
+        </div>
+
+        <div class="formula-block">
+            <strong style="font-size: 14px;">3. Erforderliche Trommeldrehzahl (\(n_{2,\text{soll}}\))</strong>
+            $$n_{2,\text{soll}} = \frac{v_{\text{soll}} \cdot 60}{U_{\text{eff}}}$$
+            <p style="font-size: 12px; color: #777;">\(v_{\text{soll}}\) = Gewünschte Bandgeschwindigkeit [m/s]</p>
+        </div>
+
+        <div class="formula-block">
+            <strong style="font-size: 14px;">4. Erforderliches Übersetzungsverhältnis (\(i_{\text{soll}}\))</strong>
+            $$i_{\text{soll}} = \frac{n_1}{n_{2,\text{soll}}}$$
+            <p style="font-size: 12px; color: #777;">\(n_1\) = Motordrehzahl [min⁻¹]</p>
+        </div>
+
+        <div class="formula-block">
+            <strong style="font-size: 14px;">5. Reale resultierende Bandgeschwindigkeit (\(v_{\text{ist}}\))</strong>
+            $$n_{2,\text{ist}} = \frac{n_1}{i_{\text{ist}}}$$
+            $$v_{\text{ist}} = \frac{U_{\text{eff}} \cdot n_{2,\text{ist}}}{60}$$
+        </div>
+    </div>
+</div>
+
+<script>
+    // Funktion zum manuellen Triggern von MathJax beim Öffnen des Modals, 
+    // falls es beim ersten Laden versteckt war.
+    function openModal() {
+        document.getElementById('infoModal').style.display = 'flex';
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise([document.getElementById('infoModal')]).catch(function (err) {
+                console.log('MathJax Error:', err.message);
+            });
+        }
+    }
+
+    function closeModal(event) {
+        document.getElementById('infoModal').style.display = 'none';
+    }
+
+    function parseGermanFloat(id) {
+        let raw = document.getElementById(id).value;
+        if (!raw) return 0;
+        let sanitized = raw.replace(',', '.'); 
+        let val = parseFloat(sanitized);
+        return isNaN(val) ? 0 : val;
+    }
+
+    function updateFromSlider(type) {
+        const slider = document.getElementById(type + '_slider');
+        const num = document.getElementById(type + '_num');
+        if (slider && num) {
+            num.value = slider.value;
+        }
+        calculate();
+    }
+
+    function updateFromNum(type) {
+        const slider = document.getElementById(type + '_slider');
+        const numVal = parseGermanFloat(type + '_num');
+        if (slider) {
+            slider.value = numVal;
+        }
+        calculate();
+    }
+
+    function drawScale(D, s) {
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        const totalD = D + (2 * s);
+        const maxDisplayPx = 170; 
+        const scale = maxDisplayPx / totalD; 
+
+        const radiusTrommel = (D / 2) * scale;
+        const radiusGurt = radiusTrommel + (s * scale);
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radiusGurt, 0, 2 * Math.PI);
+        ctx.fillStyle = '#444444'; 
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radiusTrommel, 0, 2 * Math.PI);
+        ctx.fillStyle = '#b0b0b0'; 
+        ctx.fill();
+        ctx.strokeStyle = '#777777';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radiusTrommel * 0.15 + 2, 0, 2 * Math.PI);
+        ctx.fillStyle = '#666666';
+        ctx.fill();
+
+        ctx.font = '11px sans-serif';
+        ctx.fillStyle = '#333333';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Ø ${D.toFixed(0)} mm Trommel`, centerX, centerY - radiusTrommel - 20);
+        ctx.fillText(`+ ${s.toFixed(1)} mm Gurt`, centerX, centerY + radiusGurt + 15);
+    }
+
+    function calculate() {
+        const D = parseGermanFloat('trommel_num'); 
+        const s = parseGermanFloat('band_num');     
+        const n1 = parseGermanFloat('n_motor_num'); 
+        const v_soll = parseGermanFloat('v_soll_num'); 
+        let i_ist = parseGermanFloat('i_ist_num');
+        if (i_ist === 0) i_ist = 1; 
+
+        const d_eff_m = (D + 2 * s) / 1000;
+        const u_eff_m = Math.PI * d_eff_m;
+
+        let n2_soll = 0;
+        let i_soll = 0;
+        if (u_eff_m > 0) {
+            n2_soll = (v_soll * 60) / u_eff_m;
+            if (n2_soll > 0) {
+                i_soll = n1 / n2_soll;
+            }
+        }
+
+        const n2_ist = n1 / i_ist;
+        const v_ist = (u_eff_m * n2_ist) / 60;
+
+        let v_diff_percent = 0;
+        if (v_soll > 0) {
+            v_diff_percent = ((v_ist - v_soll) / v_soll) * 100;
+        }
+
+        document.getElementById('res_d_eff').innerHTML = d_eff_m.toFixed(3) + ' <span class="unit">m</span> (' + (D + 2*s).toFixed(1) + ' mm)';
+        document.getElementById('res_u_eff').innerHTML = u_eff_m.toFixed(3) + ' <span class="unit">m/Umdr.</span>';
+        document.getElementById('res_n2_soll').innerHTML = n2_soll.toFixed(1) + ' <span class="unit">min⁻¹</span>';
+        document.getElementById('res_i_soll').innerHTML = i_soll.toFixed(2);
+        
+        document.getElementById('res_n2_ist').innerHTML = n2_ist.toFixed(1) + ' <span class="unit">min⁻¹</span>';
+        document.getElementById('res_v_ist').innerHTML = v_ist.toFixed(2) + ' <span class="unit">m/s</span>';
+
+        const diffEl = document.getElementById('res_v_diff');
+        let sign = v_diff_percent >= 0 ? '+' : '';
+        diffEl.innerHTML = sign + v_diff_percent.toFixed(1) + '%';
+        if (Math.abs(v_diff_percent) < 1.0) {
+            diffEl.style.color = '#009B4C'; 
+        } else if (Math.abs(v_diff_percent) < 5.0) {
+            diffEl.style.color = '#e67e22'; 
+        } else {
+            diffEl.style.color = '#c0392b'; 
+        }
+
+        drawScale(D, s);
+    }
+
+    const initial_d_eff = (575 + 2 * 10) / 1000;
+    const initial_u = Math.PI * initial_d_eff;
+    const initial_n2 = (1.0 * 60) / initial_u;
+    const initial_i = 1470 / initial_n2; 
+    document.getElementById('i_ist_slider').value = initial_i.toFixed(1);
+    document.getElementById('i_ist_num').value = initial_i.toFixed(2);
+
+    calculate();
+</script>
+
+</body>
+</html>
